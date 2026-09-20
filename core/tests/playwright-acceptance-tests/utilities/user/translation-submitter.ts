@@ -213,10 +213,20 @@ export class TranslationSubmitter extends BaseUser {
    * toast timer.
    */
   async expectTranslationSubmittedToast(): Promise<void> {
-    const toast = this.page.locator(translationSubmittedToastSelector);
-    await expect(toast).toHaveText('Submitted translation for review.');
-    await toast.click();
-    await expect(toast).toBeHidden();
+    const toasts = this.page.locator(translationSubmittedToastSelector);
+    const latestToast = toasts.last();
+    await expect(latestToast).toHaveText('Submitted translation for review.');
+
+    const count = await toasts.count();
+    for (let i = 0; i < count; i++) {
+      const toast = toasts.nth(i);
+      try {
+        await toast.click({timeout: 2000});
+      } catch (error) {
+        // Toast may have already dismissed automatically.
+      }
+    }
+    await expect(toasts).toHaveCount(0);
   }
 
   /** Types the given text into the translation RTE. */

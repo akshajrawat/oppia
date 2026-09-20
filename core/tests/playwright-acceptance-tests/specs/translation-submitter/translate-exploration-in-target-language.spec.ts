@@ -311,6 +311,7 @@ test.describe('Translation Submitter', function () {
     await translationSubmitter.clickOnElementWithText(
       'Save and translate another'
     );
+    await translationSubmitter.expectTranslationSubmittedToast();
     await translationSubmitter.clickOnSkipTranslationButton();
     await translationSubmitter.clickAndVerifyAnchorWithInnerText(
       'here',
