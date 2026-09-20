@@ -274,6 +274,7 @@ test.describe('Translation Submitter', function () {
     await translationSubmitter.clickOnElementWithText('UPLOAD');
     await translationSubmitter.uploadFile(testConstants.data.profilePicture);
     await translationSubmitter.clickOnElementWithText('Use This Image');
+    await translationSubmitter.expectImageUploadToComplete();
     await translationSubmitter.fillValueInTranslateTextCustomizeComponent(
       'textarea',
       'छवि विवरण'

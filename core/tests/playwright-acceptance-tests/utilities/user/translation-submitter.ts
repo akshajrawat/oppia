@@ -24,6 +24,17 @@ import {
   opportunityTranslateButtonSelector,
 } from './contributor';
 
+interface MathJaxHub {
+  Queue: (callback: () => void) => void;
+}
+
+interface MathJaxWindow extends Window {
+  MathJax?: {
+    isReady?: boolean;
+    Hub?: MathJaxHub;
+  };
+}
+
 const translateTextModalHeaderContainerSelector =
   '.e2e-test-translate-text-header-container';
 const textToTranslateContainerSelector = '.oppia-text-to-translate-container';
@@ -40,6 +51,9 @@ const skillItemSelector = '.e2e-test-rte-skill-selector-item';
 const selectedSkillSelector = '.e2e-test-rte-skill-selected';
 const copyButtonSelector = '.e2e-test-copy-button';
 const imageSelector = '.e2e-test-image';
+const savedImageContainerSelector =
+  '.e2e-test-saved-diagram-container, .filepath-editor-saved-image-container';
+const mathEditorSelector = 'math-expression-content-editor';
 const translationSubmittedToastSelector = '.e2e-test-toast-message';
 
 const translateButtonClickAttempts = 3;
@@ -153,6 +167,29 @@ export class TranslationSubmitter extends BaseUser {
           : textareaSelector;
     const field = modal.locator(selector).nth(index);
     await expect(field).toBeVisible();
+
+    const mathEditor = modal.locator(mathEditorSelector);
+    if (await mathEditor.isVisible()) {
+      await this.page.waitForFunction(() => {
+        const mathWindow = window as MathJaxWindow;
+        return Boolean(
+          mathWindow.MathJax &&
+            mathWindow.MathJax.isReady &&
+            mathWindow.MathJax.Hub
+        );
+      });
+      await this.page.evaluate(() => {
+        return new Promise<void>(resolve => {
+          const mathWindow = window as MathJaxWindow;
+          if (mathWindow.MathJax?.Hub) {
+            mathWindow.MathJax.Hub.Queue(resolve);
+          } else {
+            resolve();
+          }
+        });
+      });
+    }
+
     await field.fill(value);
 
     if (inputType === 'rte') {
@@ -160,14 +197,35 @@ export class TranslationSubmitter extends BaseUser {
     } else {
       await expect(field).toHaveValue(value);
     }
+
+    if (await mathEditor.isVisible()) {
+      // Allow debouncedUpdate$ (300ms debounce) and MathJax typesetting to settle.
+      await this.page.waitForTimeout(350);
+      await this.page.evaluate(() => {
+        return new Promise<void>(resolve => {
+          const mathWindow = window as MathJaxWindow;
+          if (mathWindow.MathJax?.Hub) {
+            mathWindow.MathJax.Hub.Queue(resolve);
+          } else {
+            resolve();
+          }
+        });
+      });
+    }
   }
 
   /** Saves the currently open RTE component modal. */
   async clickOnSaveButtonInCustomizeRTEModal(): Promise<void> {
     const saveButton = this.page.locator(rteModalSaveButtonSelector);
     await expect(saveButton).toBeVisible();
+    await expect(saveButton).toBeEnabled();
     await saveButton.click();
     await expect(saveButton).toBeHidden();
+  }
+
+  /** Waits for image upload and persistence to complete. */
+  async expectImageUploadToComplete(): Promise<void> {
+    await expect(this.page.locator(savedImageContainerSelector)).toBeVisible();
   }
 
   /** Selects a skill in the concept-card component editor. */
