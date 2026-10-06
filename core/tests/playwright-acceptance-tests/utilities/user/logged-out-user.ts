@@ -26,6 +26,7 @@ import {ExplorationEditorUtils} from '../common/exploration-editor-utils';
 
 const aboutUrl = testConstants.URLs.About;
 const baseUrl = testConstants.URLs.BaseURL;
+const blogUrl = testConstants.URLs.Blog;
 const classroomsPageUrl = testConstants.URLs.ClassroomsPage;
 const communityLibraryUrl = testConstants.URLs.CommunityLibrary;
 const homeUrl = testConstants.URLs.Home;
@@ -87,6 +88,25 @@ const mobileSidebarOpenSelector = '.e2e-test-sidebar-menu-open';
 const mobileSidebarExpandAboutMenuButton =
   'div.e2e-mobile-test-sidebar-expand-about-menu';
 const mobileSidebarAboutButton = 'a.e2e-mobile-test-sidebar-about-button';
+const navbarAboutTabBlogButton = '.e2e-test-navbar-about-menu-blog-button';
+
+const blogWelcomeHeadingSelector = '.e2e-test-blog-welcome-heading';
+const blogPostTileItemSelector = '.e2e-test-blog-post-tile-item';
+const blogPostTitleSelector = '.e2e-test-blog-post-tile-title';
+const blogPostAuthorSelector = '.e2e-test-username-visible';
+const blogPostPublishDateSelector = '.mobile-published-date';
+const blogPostTagContainerSelector = '.e2e-test-blog-tag-container';
+const blogPostTagSelector = '.e2e-test-blog-post-tag';
+const blogPaginationSelector = '.e2e-test-pagination';
+const blogPaginationNextSelector = '.e2e-test-pagination-next-button';
+const blogPostPageCardSelector = '.e2e-test-oppia-blog-post-page-card';
+const blogPostPageTitleSelector = '.e2e-test-blog-post-page-title-container';
+const blogPostAuthorNameSelector = '.e2e-test-author-name';
+const blogPostMainContentSelector = 'oppia-rte-output-display';
+const blogPostShareButtonSelector = '.share-blog-post-button';
+const blogSuggestedSectionSelector = '.post-to-recommend-section';
+const blogSuggestedHeadingSelector = '.post-to-recommend-section-heading';
+const blogPostsDisplayHeadingSelector = '.posts-display-heading';
 
 const nextCardButton = '.e2e-test-next-card-button';
 const nextCardArrowButton = '.e2e-test-next-button';
@@ -213,6 +233,174 @@ const revisionTabButtonSelector = '.e2e-test-study-tab-link';
 const revisionTabSelector = 'subtopics-list';
 
 export class LoggedOutUser extends BaseUser {
+  /**
+   * Navigates to the blog page.
+   */
+  async navigateToBlogPage(): Promise<void> {
+    await this.goto(blogUrl);
+    await this.expectElementToBeVisible(blogWelcomeHeadingSelector);
+  }
+
+  /**
+   * Navigates to the blog page via About > Blog on desktop, or directly on mobile.
+   */
+  async navigateToBlogPageViaNavbar(): Promise<void> {
+    if (this.isViewportAtMobileWidth()) {
+      await this.navigateToBlogPage();
+      return;
+    }
+
+    await this.expectElementToBeVisible(navbarAboutTab);
+    await this.clickOnElementWithSelector(navbarAboutTab);
+    await this.clickButtonToNavigateToNewPage(
+      navbarAboutTabBlogButton,
+      blogUrl
+    );
+    await this.expectElementToBeVisible(blogWelcomeHeadingSelector);
+  }
+
+  /**
+   * Expects the blog welcome message to be visible.
+   * @param {string} expectedText - The expected welcome message.
+   */
+  async expectBlogWelcomeMessageToBeVisible(
+    expectedText: string
+  ): Promise<void> {
+    await expect(this.page.locator(blogWelcomeHeadingSelector)).toHaveText(
+      expectedText
+    );
+  }
+
+  /**
+   * Expects the visible blog card count to match the expected number.
+   * @param {number} number - The expected number of cards.
+   */
+  async expectNumberOfBlogPostsOnPageToBe(number: number): Promise<void> {
+    await expect(this.page.locator(blogPostTileItemSelector)).toHaveCount(
+      number
+    );
+  }
+
+  /**
+   * Checks for a blog title using exact text matching.
+   * @param {string} title - The expected blog post title.
+   */
+  async expectBlogPostWithTitleToBePresent(title: string): Promise<void> {
+    await expect(this.page.getByText(title, {exact: true})).toBeVisible();
+  }
+
+  /**
+   * Verifies the populated blog page layout and each visible card's metadata.
+   */
+  async expectBlogPageLayoutToBeCorrect(): Promise<void> {
+    await expect(
+      this.page.locator(blogPostsDisplayHeadingSelector)
+    ).toBeVisible();
+    const cards = this.page.locator(blogPostTileItemSelector);
+    await expect(cards.first()).toBeVisible();
+    const cardCount = await cards.count();
+
+    for (let index = 0; index < cardCount; index++) {
+      const card = cards.nth(index);
+      await expect(card.locator(blogPostTitleSelector)).toHaveText(/\S/);
+      await expect(card.locator(blogPostAuthorSelector)).toHaveText(/\S/);
+      await expect(card.locator(blogPostPublishDateSelector)).toHaveText(/\S/);
+      await expect(card.locator(blogPostTagContainerSelector)).toBeVisible();
+      await expect(card.locator(blogPostTagSelector).first()).toBeVisible();
+    }
+
+    await expect(this.page.locator(blogPaginationSelector)).toBeVisible();
+  }
+
+  /**
+   * Clicks Next and waits until the first card title changes.
+   */
+  async clickNextBlogPage(): Promise<void> {
+    const firstTitle = this.page.locator(blogPostTitleSelector).first();
+    const initialTitle = (await firstTitle.textContent())?.trim();
+    if (!initialTitle) {
+      throw new Error('No blog post title was found before pagination.');
+    }
+
+    await this.page.locator(blogPaginationNextSelector).click();
+    await expect(firstTitle).not.toHaveText(initialTitle);
+  }
+
+  /**
+   * Opens the first article from the blog list.
+   */
+  async clickOnFirstBlogPost(): Promise<void> {
+    await this.page.locator(blogPostTitleSelector).first().click();
+    await expect(
+      this.page.locator(blogPostPageCardSelector).first()
+    ).toBeVisible();
+  }
+
+  /**
+   * Expects the article title to be visible in the main article card.
+   */
+  async expectBlogPostTitleToBeVisible(): Promise<void> {
+    const article = this.page.locator(blogPostPageCardSelector).first();
+    await expect(article.locator(blogPostPageTitleSelector)).toHaveText(/\S/);
+  }
+
+  /**
+   * Expects the article author and publication date to be visible.
+   */
+  async expectBlogPostAuthorToBeVisible(): Promise<void> {
+    const article = this.page.locator(blogPostPageCardSelector).first();
+    await expect(article.locator(blogPostAuthorNameSelector)).toHaveText(/\S/);
+  }
+
+  /**
+   * Expects the article publication date to be visible.
+   */
+  async expectBlogPostPublishDateToBeVisible(): Promise<void> {
+    const article = this.page.locator(blogPostPageCardSelector).first();
+    await expect(article.locator(blogPostPublishDateSelector)).toHaveText(/\S/);
+  }
+
+  /**
+   * Checks the main article's rich text body, excluding recommendation cards.
+   */
+  async expectBlogPostContentToBeVisible(): Promise<void> {
+    const article = this.page.locator(blogPostPageCardSelector).first();
+    await expect(article.locator(blogPostMainContentSelector)).toBeVisible();
+    await expect(article.locator(blogPostMainContentSelector)).toHaveText(/\S/);
+  }
+
+  /**
+   * Expects at least one tag on the article, outside the recommendations.
+   */
+  async expectBlogPostTagsToBeVisible(): Promise<void> {
+    const articleTags = this.page.locator('.blog-card-tag-container').first();
+    await expect(articleTags.locator('span').first()).toHaveText(/\S/);
+  }
+
+  /**
+   * Expects the article sharing control to be visible.
+   */
+  async expectBlogShareButtonToBeVisible(): Promise<void> {
+    await expect(
+      this.page
+        .locator(blogPostPageCardSelector)
+        .first()
+        .locator(blogPostShareButtonSelector)
+    ).toBeVisible();
+  }
+
+  /**
+   * Expects recommendations and their heading on a populated blog page.
+   */
+  async expectSuggestedBlogPostsSectionToBeVisible(): Promise<void> {
+    const section = this.page.locator(blogSuggestedSectionSelector);
+    await expect(section).toBeVisible();
+    await expect(section.locator(blogSuggestedHeadingSelector)).toBeVisible();
+    await expect(
+      section.locator(blogPostTileItemSelector).first()
+    ).toBeVisible();
+  }
+
   /**
    * Changes the language of the lesson.
    * @param {string} languageCode - The code of the language to change to.
