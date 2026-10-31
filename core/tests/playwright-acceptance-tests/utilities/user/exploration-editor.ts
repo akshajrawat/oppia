@@ -16,7 +16,7 @@
  * @fileoverview Utility functions for the Exploration Editor page.
  */
 
-import {Page, ElementHandle} from '@playwright/test';
+import {Page, ElementHandle, Locator, expect} from '@playwright/test';
 import {BaseUser} from '../common/playwright-utils';
 import testConstants from '../common/test-constants';
 import {showMessage} from '../common/show-message';
@@ -221,6 +221,114 @@ export const INTERACTION_TABS_OF_INTERACTION_TYPE: Record<string, string> = {
 const addTitleBar = 'input#explorationTitle';
 
 export class ExplorationEditor extends BaseUser {
+  private async navigateToFeedbackOrStatsTab(
+    tab: 'feedback' | 'stats'
+  ): Promise<void> {
+    if (this.isViewportAtMobileWidth()) {
+      if (!(await this.page.locator(mobileNavbarOptions).isVisible())) {
+        await this.clickOnElementWithSelector(mobileOptionsButtonSelector);
+      }
+      await this.clickOnElementWithSelector(mobileNavbarDropdown);
+      await this.page.locator(`.e2e-test-mobile-${tab}-button a`).click();
+    } else {
+      await this.clickOnElementWithSelector(`.e2e-test-${tab}-tab`);
+    }
+    await expect(
+      this.page.locator(
+        `.e2e-test-exploration-${tab === 'stats' ? 'stats' : 'feedback'}-card`
+      )
+    ).toBeVisible();
+  }
+
+  async navigateToFeedbackTab(): Promise<void> {
+    await this.navigateToFeedbackOrStatsTab('feedback');
+  }
+
+  async navigateToStatsTab(): Promise<void> {
+    await this.navigateToFeedbackOrStatsTab('stats');
+  }
+
+  private feedbackRow(subject: string): Locator {
+    return this.page.locator('.e2e-test-oppia-feedback-tab-row').filter({
+      has: this.page.getByText(subject, {exact: true}),
+    });
+  }
+
+  async startAFeedbackThread(subject: string, feedback: string): Promise<void> {
+    await this.clickOnElementWithSelector('.e2e-test-start-new-thread-button');
+    const modal = this.page.locator('oppia-create-feedback-thread-modal');
+    await expect(modal).toBeVisible();
+    await modal.locator('input').fill(subject);
+    await modal.locator('textarea').fill(feedback);
+    await expect(modal.locator('input')).toHaveValue(subject);
+    await expect(modal.locator('textarea')).toHaveValue(feedback);
+    await modal.locator('.e2e-test-create-new-feedback-btn').click();
+    await expect(modal).toBeHidden();
+    await expect(this.feedbackRow(subject)).toBeVisible();
+  }
+
+  async expectFeedbackStatusInList(
+    subject: string,
+    status: string
+  ): Promise<void> {
+    await expect(
+      this.feedbackRow(subject).locator('.e2e-test-exploration-feedback-status')
+    ).toHaveText(status);
+  }
+
+  async viewFeedbackThread(subject: string): Promise<void> {
+    await this.feedbackRow(subject).click();
+    await expect(
+      this.page.locator('.e2e-test-exploration-feedback-card-active')
+    ).toContainText(subject);
+  }
+
+  async expectFeedbackMessageToBePresent(message: string): Promise<void> {
+    await expect(
+      this.page
+        .locator('.e2e-test-exploration-feedback')
+        .filter({hasText: message})
+    ).toBeVisible();
+  }
+
+  async replyToFeedback(reply: string): Promise<void> {
+    const textarea = this.page.locator('.e2e-test-feedback-response-textarea');
+    const send = this.page.locator(
+      '.e2e-test-oppia-feedback-response-send-btn'
+    );
+    await this.select('.e2e-test-oppia-feedback-status-menu', 'fixed');
+    await textarea.fill(reply);
+    await expect(textarea).toHaveValue(reply);
+    await send.click();
+    await this.expectFeedbackMessageToBePresent(reply);
+    await expect(textarea).toHaveValue('');
+    await expect(send).toBeDisabled();
+  }
+
+  async goBackToTheFeedbackTab(): Promise<void> {
+    const back = this.page.locator('.e2e-test-oppia-feedback-back-button');
+    await back.click();
+    await expect(back).toBeHidden();
+  }
+
+  async expectFeedbackReplyDetailsToBeVisible(
+    subject: string,
+    author: string
+  ): Promise<void> {
+    const row = this.feedbackRow(subject);
+    await expect(
+      row.locator('.e2e-test-exploration-feedback-author')
+    ).toHaveText(author);
+    await expect(row.locator('td:nth-child(4) span')).not.toBeEmpty();
+    await expect(row.locator('td:nth-child(4) span')).toBeVisible();
+  }
+
+  async expectNumberOfPassersToBe(expected: number): Promise<void> {
+    await expect(this.page.locator('.e2e-test-num-passersby')).toHaveText(
+      `${expected} learners browsed this exploration. They left before reaching the second card.`
+    );
+  }
+
   /**
    * Navigate to creator dashboard page.
    */
